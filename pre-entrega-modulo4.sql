@@ -1,54 +1,60 @@
--- Muesto nombre de categorias, nombre de productos y el total de ingresos de cada producto vendido por categorias, 
--- los agrupo por nombre de categorias y nombre de productos, los filtro por aquellos productos que en total se vendieron y se recaudaron mas de 100 mil pesos 
--- y los ordeno de mayor a menor por el total_vendido
+/*Muestra el nombre de cada categoría, la cantidad
+total de unidades vendidas y el ingreso total generado.
+Se muestran únicamente las categorías cuyos ingresos superan los $100.000.
+Y se ordenan las categorías de mayor a menor ingreso. */
 SELECT c.nombre AS nombre_categoria,
-		p.nombre AS producto_vendido,
-		SUM(v.precio_unitario * v.cantidad) AS total_vendido
+    SUM(v.cantidad) AS unidades_vendidas,
+    SUM(v.precio_unitario * v.cantidad) AS total_ingreso
 FROM categorias c
 INNER JOIN productos p
-	ON c.id_categoria = p.id_categoria
+    ON c.id_categoria = p.id_categoria
 INNER JOIN ventas v
-	ON p.id_producto = id_venta
-GROUP BY c.nombre, p.nombre
+    ON p.id_producto = v.id_producto
+GROUP BY c.id_categoria, c.nombre
 HAVING SUM(v.precio_unitario * v.cantidad) > 100000
-ORDER BY total_vendido DESC;
+ORDER BY total_ingreso DESC;
 
--- Muestro todos los clientes registrados que aun no realizaron ninguna compra
-SELECT c.*
+/*Muestra los clientes registrados que no tienen
+ninguna venta asociada. Utiliza LEFT JOIN para conservar
+todos los clientes y filtra aquellos que no tienen coincidencias
+en la tabla ventas. */
+SELECT
+    c.id_cliente,
+    c.nombre,
+    c.apellido,
+	COALESCE(v.id_venta::VARCHAR, 'Sin compras') AS estado_compra
 FROM clientes c
 LEFT JOIN ventas v
     ON c.id_cliente = v.id_cliente
 WHERE v.id_venta IS NULL;
 
-SELECT c.nombre, c.apellido, p.nombre AS nombre_producto, v.fecha
-FROM categorias ca
-INNER JOIN productos p
- ON ca.id_categoria = p.id_categoria
-INNER JOIN ventas v
- ON p.id_producto = v.id_producto
-INNER JOIN clientes c
- ON v.id_cliente = c.id_cliente
-
-
--- Muestro el nombre y apellido del cliente, nombre, fecha de su ultima compra y cantidad de ese producto vendido
+/*Muestra el nombre y apellido de cada cliente,
+ el producto que más unidades compró y la fecha de su última
+ compra de ese producto. Une las tablas clientes,
+ ventas y productos, y utiliza una subconsulta con LIMIT 1
+ para seleccionar el producto más comprado por cada cliente.  */
 SELECT
     c.nombre,
     c.apellido,
     p.nombre AS nombre_producto,
-    MAX(v.fecha) AS ultima_transaccion,
-    SUM(v.cantidad) AS cantidad_comprada
-FROM categorias ca
-INNER JOIN productos p
-    ON ca.id_categoria = p.id_categoria
+    MAX(v.fecha) AS ultima_transaccion
+FROM clientes c
 INNER JOIN ventas v
-    ON p.id_producto = v.id_producto
-INNER JOIN clientes c
-    ON v.id_cliente = c.id_cliente
+    ON c.id_cliente = v.id_cliente
+INNER JOIN productos p
+    ON v.id_producto = p.id_producto
+WHERE p.id_producto = (
+    SELECT v2.id_producto
+    FROM ventas v2
+    WHERE v2.id_cliente = c.id_cliente
+    GROUP BY v2.id_producto
+    ORDER BY COUNT(*) DESC
+    LIMIT 1
+)
 GROUP BY
     c.id_cliente,
     c.nombre,
     c.apellido,
     p.id_producto,
     p.nombre
-ORDER BY cantidad_comprada DESC
-LIMIT 1;
+ORDER BY c.nombre;
